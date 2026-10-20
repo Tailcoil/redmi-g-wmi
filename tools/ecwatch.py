@@ -45,7 +45,7 @@ def main():
             a, b = field_value(prev, off, bits), field_value(cur, off, bits)
             if a != b:
                 changes.append(f'{name} {a}->{b}')
-        # 没有命名的字节也报告，往往是没有在 ACPI 里用到的隐藏状态
+        # ACPI 里没命名的字节也报告
         for i in range(256):
             if i not in covered and prev[i] != cur[i]:
                 changes.append(f'[0x{i:02X}] {prev[i]}->{cur[i]}')

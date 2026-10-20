@@ -51,9 +51,8 @@ enum mifs_lock {
 };
 
 /*
- * 模式编号是 BIOS 接口上的值，和 EC 的 ITSM 不同：
- * 1/2 对应 ITSM 1/2，3 对应 ITSM 0，4 对应 ITSM 3。
- * 适配器不足 180W 时 BIOS 会强制降到 2，用电池时 3/4 会降到 1。
+ * BIOS 接口的模式编号，3/4 对应 EC 的 ITSM 0/3。
+ * 适配器 ≤180W 时降为 2，用电池时 3/4 降为 1。
  */
 enum mifs_mode {
 	MODE_BALANCED	= 1,
@@ -62,7 +61,7 @@ enum mifs_mode {
 	MODE_MAX	= 4,
 };
 
-/* 插上适配器后 EC 要 1~3 秒才报出功率，期间 BIOS 会把模式压到 2 */
+/* 插上适配器后 EC 要 1~3 秒才认出功率，期间请求会被降档 */
 #define RETRY_INTERVAL_MS	500
 #define RETRY_COUNT		10
 
@@ -146,9 +145,8 @@ static int mode_get(struct redmi_g_wmi *drv)
 }
 
 /*
- * BIOS 会按供电情况悄悄改写请求，设置后读回确认，被改写时返回 -EAGAIN。
- * 实际模式由 BIOS 的 0x16 事件通知出去；这里可能处在 platform_profile
- * 的锁内，不能调用 platform_profile_notify()。
+ * BIOS 会按供电改写请求，读回不一致时返回 -EAGAIN。
+ * 可能在 platform_profile 的锁内调用，不能 notify，通知走 0x16 事件。
  */
 static int mode_set(struct redmi_g_wmi *drv, int mode)
 {
@@ -174,7 +172,6 @@ static void mode_retry(struct work_struct *work)
 		schedule_delayed_work(&drv->retry, msecs_to_jiffies(RETRY_INTERVAL_MS));
 }
 
-/* 接着电源却被降档，多半是 EC 还没认出适配器，稍后重试 */
 static int mode_request(struct redmi_g_wmi *drv, int mode)
 {
 	int ret;
@@ -244,7 +241,7 @@ static const struct platform_profile_ops profile_ops = {
 	.profile_set = profile_set,
 };
 
-/* 风扇编号沿用 EC（F1/F2），哪个对应 CPU 还没确认；temp1 是 CPU（EC TSR6） */
+/* 风扇编号沿用 EC 的 F1/F2；temp1 是 CPU（TSR6） */
 static int fan_temp_read(struct device *dev, enum hwmon_sensor_types type,
 			 u32 attr, int channel, long *val)
 {
@@ -424,7 +421,6 @@ static void event_handle(struct wmi_device *wdev, const struct wmi_buffer *buf)
 	payload = get_unaligned_le32(p);
 	entry = sparse_keymap_entry_from_scancode(drv->input, payload);
 	if (!entry) {
-		/* 没见过的事件，留着方便继续摸 BIOS 接口 */
 		dev_notice_ratelimited(&wdev->dev, "unknown event %*ph\n", 8, p);
 		return;
 	}

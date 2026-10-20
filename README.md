@@ -65,10 +65,24 @@ echo 1 | sudo tee touchpad_lock
 | `fn_lock` | F1–F12 默认是功能键 |
 | `win_lock` | Win 键禁用 |
 
+## 控制台
+
+`console/` 是网页控制台：切换模式、开关锁、实时查看温度、风扇、功率限制和每个核心的频率电压。只监听本机，默认 `http://127.0.0.1:8930`。
+
+```sh
+cargo build --release --manifest-path console/Cargo.toml
+sudo install -Dm755 console/target/release/redmi-g-console /usr/local/bin/redmi-g-console
+sudo install -Dm644 console/redmi-g-console.service /etc/systemd/system/redmi-g-console.service
+sudo systemctl enable --now redmi-g-console
+```
+
+功率限制和核心数据来自 [ryzen_smu](https://github.com/amkillam/ryzen_smu)，适配器功率要 root 和 `ec_sys`，缺了对应部分就不显示。本机所有用户都能访问控制台。
+
 ## 目录
 
 - `driver/`：内核模块
 - `upstream/`：上游原版代码（Linux v7.2.9），用来对照
+- `console/`：网页控制台
 - `tools/`：BIOS 接口探测脚本
 
 ## 许可证

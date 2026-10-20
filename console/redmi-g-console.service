@@ -1,0 +1,17 @@
+[Unit]
+Description=Redmi G 控制台
+
+[Service]
+# 适配器功率要从 EC 读
+ExecStartPre=-/usr/bin/modprobe ec_sys
+ExecStart=/usr/local/bin/redmi-g-console
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

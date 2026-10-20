@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redmi G</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Redmi G</h1>
+    <span id="supply"></span>
+  </header>
+
+  <div id="modes" class="seg">
+    <button data-profile="low-power">安静</button>
+    <button data-profile="balanced">均衡</button>
+    <button data-profile="balanced-performance">性能</button>
+    <button data-profile="performance">狂暴</button>
+  </div>
+
+  <section class="tiles">
+    <div class="tile" data-key="cpu"><span class="label">CPU</span><span class="value"></span><svg class="spark"></svg></div>
+    <div class="tile" data-key="power"><span class="label">功耗</span><span class="value"></span><svg class="spark"></svg></div>
+    <div class="tile" data-key="fan1"><span class="label">风扇 1</span><span class="value"></span><svg class="spark"></svg></div>
+    <div class="tile" data-key="fan2"><span class="label">风扇 2</span><span class="value"></span><svg class="spark"></svg></div>
+  </section>
+
+  <section class="cols">
+    <div class="card">
+      <h2>限制</h2>
+      <div id="limits"></div>
+    </div>
+    <div class="card">
+      <h2>核心</h2>
+      <table id="cores">
+        <thead><tr><th></th><th>GHz</th><th>V</th><th>°C</th><th>W</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card locks">
+    <label><input type="checkbox" data-lock="touchpad_lock"><span>触控板锁</span></label>
+    <label><input type="checkbox" data-lock="fn_lock"><span>Fn 锁</span></label>
+    <label><input type="checkbox" data-lock="win_lock"><span>Win 键锁</span></label>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>
