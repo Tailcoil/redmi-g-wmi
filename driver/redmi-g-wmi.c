@@ -11,6 +11,7 @@
 #include <linux/acpi.h>
 #include <linux/bits.h>
 #include <linux/device.h>
+#include <linux/devm-helpers.h>
 #include <linux/err.h>
 #include <linux/hwmon.h>
 #include <linux/input.h>
@@ -23,9 +24,11 @@
 #include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
+#include <linux/power_supply.h>
 #include <linux/unaligned.h>
 #include <linux/units.h>
 #include <linux/wmi.h>
+#include <linux/workqueue.h>
 
 #define DRV_NAME		"redmi-g-wmi"
 #define MIFS_GUID		"B60BFB48-3E5B-49E4-A0E9-8CFFE1B3434B"
@@ -57,6 +60,10 @@ enum mifs_mode {
 	MODE_PERF	= 3,
 	MODE_MAX	= 4,
 };
+
+/* 插上适配器后 EC 要过 1~3 秒才报出功率，这段时间里 BIOS 会把模式压到 2 */
+#define RETRY_INTERVAL_MS	500
+#define RETRY_COUNT		10
 
 #define EVENT_TYPE_HOTKEY	1
 #define EVENT_ID_PERF_MODE	0x16
@@ -90,6 +97,9 @@ struct redmi_g_wmi {
 	struct device *pp_dev;
 	struct notifier_block nb;
 	struct input_dev *input;
+	struct delayed_work retry;
+	int want_mode;
+	int retries;
 	int saved_mode;
 };
 
@@ -134,7 +144,11 @@ static int mode_get(struct redmi_g_wmi *drv)
 	return ret ?: le16_to_cpu(out.data0);
 }
 
-/* BIOS 会按供电情况悄悄改写请求，设置后读回确认 */
+/*
+ * BIOS 会按供电情况悄悄改写请求，设置后读回确认，被改写时返回 -EAGAIN。
+ * 实际模式由 BIOS 的 0x16 事件通知出去；这里可能处在 platform_profile
+ * 的锁内，不能调用 platform_profile_notify()。
+ */
 static int mode_set(struct redmi_g_wmi *drv, int mode)
 {
 	int ret;
@@ -146,10 +160,35 @@ static int mode_set(struct redmi_g_wmi *drv, int mode)
 	ret = mode_get(drv);
 	if (ret < 0)
 		return ret;
-	if (ret != mode) {
-		platform_profile_notify(drv->pp_dev);
+	return ret == mode ? 0 : -EAGAIN;
+}
+
+static void mode_retry(struct work_struct *work)
+{
+	struct redmi_g_wmi *drv = container_of(to_delayed_work(work),
+					       struct redmi_g_wmi, retry);
+
+	if (mode_set(drv, drv->want_mode) == -EAGAIN && --drv->retries > 0 &&
+	    power_supply_is_system_supplied() > 0)
+		schedule_delayed_work(&drv->retry, msecs_to_jiffies(RETRY_INTERVAL_MS));
+}
+
+/* 接着电源却被降档，多半是 EC 还没认出适配器，稍后重试 */
+static int mode_request(struct redmi_g_wmi *drv, int mode)
+{
+	int ret;
+
+	cancel_delayed_work_sync(&drv->retry);
+
+	ret = mode_set(drv, mode);
+	if (ret != -EAGAIN)
+		return ret;
+	if (power_supply_is_system_supplied() <= 0)
 		return -EOPNOTSUPP;
-	}
+
+	drv->want_mode = mode;
+	drv->retries = RETRY_COUNT;
+	schedule_delayed_work(&drv->retry, msecs_to_jiffies(RETRY_INTERVAL_MS));
 	return 0;
 }
 
@@ -187,7 +226,7 @@ static int profile_set(struct device *dev, enum platform_profile_option profile)
 
 	for (int i = 0; i < ARRAY_SIZE(mode_map); i++)
 		if (mode_map[i].profile == profile)
-			return mode_set(drv, mode_map[i].mode);
+			return mode_request(drv, mode_map[i].mode);
 	return -EOPNOTSUPP;
 }
 
@@ -453,6 +492,10 @@ static int probe_control(struct redmi_g_wmi *drv)
 	if (IS_ERR(hwmon))
 		return PTR_ERR(hwmon);
 
+	ret = devm_delayed_work_autocancel(dev, &drv->retry, mode_retry);
+	if (ret)
+		return ret;
+
 	drv->nb.notifier_call = mode_notify;
 	ret = blocking_notifier_chain_register(&mode_notifier, &drv->nb);
 	if (ret)
@@ -485,8 +528,10 @@ static int redmi_g_wmi_suspend(struct device *dev)
 {
 	struct redmi_g_wmi *drv = dev_get_drvdata(dev);
 
-	if (drv->pp_dev)
+	if (drv->pp_dev) {
+		cancel_delayed_work_sync(&drv->retry);
 		drv->saved_mode = mode_get(drv);
+	}
 	return 0;
 }
 
@@ -495,7 +540,7 @@ static int redmi_g_wmi_resume(struct device *dev)
 	struct redmi_g_wmi *drv = dev_get_drvdata(dev);
 
 	if (drv->pp_dev && drv->saved_mode > 0 && mode_get(drv) != drv->saved_mode)
-		mode_set(drv, drv->saved_mode);
+		mode_request(drv, drv->saved_mode);
 	return 0;
 }
 
