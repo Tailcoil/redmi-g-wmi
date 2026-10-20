@@ -6,9 +6,6 @@
  * 按这台机器 BIOS 实际实现的 MiInterface 功能重写。
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
-#include <linux/acpi.h>
 #include <linux/bits.h>
 #include <linux/device.h>
 #include <linux/devm-helpers.h>
@@ -22,9 +19,9 @@
 #include <linux/notifier.h>
 #include <linux/platform_profile.h>
 #include <linux/pm.h>
+#include <linux/power_supply.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
-#include <linux/power_supply.h>
 #include <linux/unaligned.h>
 #include <linux/units.h>
 #include <linux/wmi.h>
@@ -33,6 +30,10 @@
 #define DRV_NAME		"redmi-g-wmi"
 #define MIFS_GUID		"B60BFB48-3E5B-49E4-A0E9-8CFFE1B3434B"
 #define EVENT_GUID		"46C93E13-EE9B-4262-8488-563BCA757FEF"
+
+/* id_table 的 context，用来区分两个 GUID */
+#define DEV_CONTROL		NULL
+#define DEV_EVENT		((void *)1)
 
 #define MIFS_GET		0xFA00
 #define MIFS_SET		0xFB00
@@ -61,7 +62,7 @@ enum mifs_mode {
 	MODE_MAX	= 4,
 };
 
-/* 插上适配器后 EC 要过 1~3 秒才报出功率，这段时间里 BIOS 会把模式压到 2 */
+/* 插上适配器后 EC 要 1~3 秒才报出功率，期间 BIOS 会把模式压到 2 */
 #define RETRY_INTERVAL_MS	500
 #define RETRY_COUNT		10
 
@@ -198,8 +199,8 @@ static const struct {
 } mode_map[] = {
 	{ MODE_QUIET,		PLATFORM_PROFILE_LOW_POWER },
 	{ MODE_BALANCED,	PLATFORM_PROFILE_BALANCED },
-	{ MODE_PERF,		PLATFORM_PROFILE_PERFORMANCE },
-	{ MODE_MAX,		PLATFORM_PROFILE_MAX_POWER },
+	{ MODE_PERF,		PLATFORM_PROFILE_BALANCED_PERFORMANCE },
+	{ MODE_MAX,		PLATFORM_PROFILE_PERFORMANCE },
 };
 
 static int profile_get(struct device *dev, enum platform_profile_option *profile)
@@ -245,7 +246,7 @@ static const struct platform_profile_ops profile_ops = {
 
 /* 风扇编号沿用 EC（F1/F2），哪个对应 CPU 还没确认；temp1 是 CPU（EC TSR6） */
 static int fan_temp_read(struct device *dev, enum hwmon_sensor_types type,
-		      u32 attr, int channel, long *val)
+			 u32 attr, int channel, long *val)
 {
 	struct redmi_g_wmi *drv = dev_get_drvdata(dev);
 	struct mifs_out out;
@@ -269,7 +270,7 @@ static int fan_temp_read(struct device *dev, enum hwmon_sensor_types type,
 }
 
 static int fan_temp_label(struct device *dev, enum hwmon_sensor_types type,
-			     u32 attr, int channel, const char **str)
+			  u32 attr, int channel, const char **str)
 {
 	if (type == hwmon_temp && channel == 0) {
 		*str = "CPU";
@@ -281,15 +282,12 @@ static int fan_temp_label(struct device *dev, enum hwmon_sensor_types type,
 static umode_t fan_temp_visible(const void *data, enum hwmon_sensor_types type,
 				u32 attr, int channel)
 {
-	if (type == hwmon_temp && attr == hwmon_temp_label && channel != 0)
-		return 0;
 	return 0444;
 }
 
 static const struct hwmon_channel_info *const fan_temp_info[] = {
 	HWMON_CHANNEL_INFO(fan, HWMON_F_INPUT, HWMON_F_INPUT),
-	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT | HWMON_T_LABEL,
-			   HWMON_T_INPUT | HWMON_T_LABEL),
+	HWMON_CHANNEL_INFO(temp, HWMON_T_INPUT | HWMON_T_LABEL, HWMON_T_INPUT),
 	NULL
 };
 
@@ -304,11 +302,7 @@ static const struct hwmon_chip_info fan_temp_chip = {
 	.info = fan_temp_info,
 };
 
-/*
- * 三个锁的读写语义并不一致：
- * 触控板和 Win 键是直接读写 EC 位；Fn 锁读回的是 !FNHK，写入 1 时 BIOS 清掉 FNHK。
- * 这里统一成“写什么读回什么”。
- */
+/* 值为 1 时：触控板禁用、F1–F12 默认是功能键、Win 键禁用 */
 static ssize_t lock_show(struct device *dev, char *buf, enum mifs_lock lock)
 {
 	struct redmi_g_wmi *drv = dev_get_drvdata(dev);
@@ -520,7 +514,7 @@ static int redmi_g_wmi_probe(struct wmi_device *wdev, const void *context)
 
 	dev_set_drvdata(&wdev->dev, drv);
 
-	return context ? probe_event(drv) : probe_control(drv);
+	return context == DEV_EVENT ? probe_event(drv) : probe_control(drv);
 }
 
 /* 唤醒后 EC 可能回到默认模式，恢复休眠前的选择 */
@@ -547,8 +541,8 @@ static int redmi_g_wmi_resume(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(redmi_g_wmi_pm, redmi_g_wmi_suspend, redmi_g_wmi_resume);
 
 static const struct wmi_device_id redmi_g_wmi_id_table[] = {
-	{ MIFS_GUID, NULL },
-	{ EVENT_GUID, (void *)1 },
+	{ MIFS_GUID, DEV_CONTROL },
+	{ EVENT_GUID, DEV_EVENT },
 	{}
 };
 MODULE_DEVICE_TABLE(wmi, redmi_g_wmi_id_table);
