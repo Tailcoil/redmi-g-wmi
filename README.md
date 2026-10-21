@@ -7,6 +7,8 @@ Redmi G 2022（锐龙版，主板 TM2137）的 WMI 驱动，替代内核自带�
 - 触控板锁、Fn 锁、Win 键锁
 - 热键
 
+在 CachyOS、内核 7.2 上测试过。
+
 ## 安装
 
 需要 `dkms` 和当前内核的头文件。
@@ -17,6 +19,15 @@ sudo dkms install redmi-g-wmi/0.1.0
 printf 'blacklist bitland_mifs_wmi\nblacklist redmi_wmi\n' | sudo tee /etc/modprobe.d/redmi-g-wmi.conf
 sudo modprobe -r bitland_mifs_wmi redmi_wmi
 sudo modprobe redmi-g-wmi
+```
+
+更新：
+
+```sh
+sudo dkms remove redmi-g-wmi/0.1.0 --all
+sudo dkms add ./driver
+sudo dkms install redmi-g-wmi/0.1.0
+sudo modprobe -r redmi-g-wmi && sudo modprobe redmi-g-wmi
 ```
 
 卸载：
@@ -44,7 +55,7 @@ cat /sys/firmware/acpi/platform_profile
 echo balanced-performance | sudo tee /sys/firmware/acpi/platform_profile
 ```
 
-power-profiles-daemon 没有 `balanced-performance`，只能用上面的方式或 Fn+K 切换。
+power-profiles-daemon 没有 `balanced-performance`，要用上面的命令、控制台或 Fn+K 切换。
 
 ### 传感器
 
@@ -81,9 +92,9 @@ sudo systemctl enable --now redmi-g-console
 ## 目录
 
 - `driver/`：内核模块
-- `upstream/`：上游原版代码（Linux v7.2.9），用来对照
 - `console/`：网页控制台
 - `tools/`：BIOS 接口探测脚本
+- `upstream/`：上游原版代码（Linux v7.2.9），用来对照
 
 ## 许可证
 
