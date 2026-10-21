@@ -87,4 +87,4 @@ sudo systemctl enable --now redmi-g-console
 
 ## 许可证
 
-GPL-2.0-or-later
+`driver/` 含 redmi-wmi 的代码，按 GPL-2.0-only 发布；其余部分是 GPL-2.0-or-later。

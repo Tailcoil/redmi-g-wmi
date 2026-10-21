@@ -1,10 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Redmi G 2022（TM2137）WMI 驱动。
  *
- * 基于 bitland-mifs-wmi（Mingyou Chen）和 redmi-wmi（Gladyshev Ilya），
- * 按这台机器 BIOS 实际实现的 MiInterface 功能重写。
+ * 基于 bitland-mifs-wmi 和 redmi-wmi，按这台机器 BIOS 实际实现的
+ * MiInterface 功能重写。
+ *
+ * Copyright (C) 2026 Tailcoil
+ * Copyright (C) 2026 Mingyou Chen <qby140326@gmail.com>
  */
+
 
 #include <linux/bits.h>
 #include <linux/device.h>
