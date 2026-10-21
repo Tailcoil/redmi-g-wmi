@@ -47,6 +47,7 @@ async fn main() {
         snapshot: watch::channel(String::new()).0,
         refresh: Notify::new(),
         hosts: vec![
+            listen.to_string(),
             format!("localhost:{port}"),
             format!("127.0.0.1:{port}"),
             format!("[::1]:{port}"),
@@ -78,10 +79,8 @@ async fn main() {
         Err(e) => fail(format!("无法监听 {listen}：{e}")),
     };
     eprintln!("http://{listen}");
+    // 没有要保存的状态，直接靠信号退出；优雅退出会一直等 SSE 连接
     axum::serve(listener, router)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
         .await
         .unwrap_or_else(|e| fail(e.to_string()));
 }
