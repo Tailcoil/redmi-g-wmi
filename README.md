@@ -1,6 +1,6 @@
 # redmi-g-wmi
 
-Redmi G 2022（锐龙版，主板 TM2137）的 WMI 驱动，替代内核自带的 `bitland-mifs-wmi` 和 `redmi-wmi`。
+Redmi G 2022（锐龙版，主板 TM2137）的 WMI 驱动，替代内核自带的 `bitland-mifs-wmi` 和 `redmi-wmi`。按 DMI 判断机型，别的机器上不会加载。
 
 - 4 档性能模式，和 Fn+K 同步
 - 风扇转速、CPU 温度

@@ -9,10 +9,10 @@
  * Copyright (C) 2026 Mingyou Chen <qby140326@gmail.com>
  */
 
-
 #include <linux/bits.h>
 #include <linux/device.h>
 #include <linux/devm-helpers.h>
+#include <linux/dmi.h>
 #include <linux/err.h>
 #include <linux/hwmon.h>
 #include <linux/input.h>
@@ -94,6 +94,17 @@ struct mifs_out {
 static_assert(sizeof(struct mifs_in) == 32);
 
 static BLOCKING_NOTIFIER_HEAD(mode_notifier);
+
+/* 其他机型也用这两个 GUID，但 BIOS 功能号不同 */
+static const struct dmi_system_id redmi_g_dmi[] = {
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TIMI"),
+			DMI_MATCH(DMI_BOARD_NAME, "TM2137"),
+		},
+	},
+	{}
+};
 
 struct redmi_g_wmi {
 	struct wmi_device *wdev;
@@ -502,6 +513,9 @@ static int redmi_g_wmi_probe(struct wmi_device *wdev, const void *context)
 {
 	struct redmi_g_wmi *drv;
 	int ret;
+
+	if (!dmi_check_system(redmi_g_dmi))
+		return -ENODEV;
 
 	drv = devm_kzalloc(&wdev->dev, sizeof(*drv), GFP_KERNEL);
 	if (!drv)
