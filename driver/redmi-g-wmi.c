@@ -477,6 +477,10 @@ static int probe_control(struct redmi_g_wmi *drv)
 	struct device *hwmon;
 	int ret;
 
+	ret = devm_delayed_work_autocancel(dev, &drv->retry, mode_retry);
+	if (ret)
+		return ret;
+
 	drv->pp_dev = devm_platform_profile_register(dev, DRV_NAME, drv, &profile_ops);
 	if (IS_ERR(drv->pp_dev))
 		return PTR_ERR(drv->pp_dev);
@@ -485,10 +489,6 @@ static int probe_control(struct redmi_g_wmi *drv)
 						     &fan_temp_chip, NULL);
 	if (IS_ERR(hwmon))
 		return PTR_ERR(hwmon);
-
-	ret = devm_delayed_work_autocancel(dev, &drv->retry, mode_retry);
-	if (ret)
-		return ret;
 
 	drv->nb.notifier_call = mode_notify;
 	ret = blocking_notifier_chain_register(&mode_notifier, &drv->nb);
