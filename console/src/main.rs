@@ -173,10 +173,15 @@ async fn write(app: Arc<App>, f: impl FnOnce() -> io::Result<()> + Send + 'stati
                 io::ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
                 io::ErrorKind::NotFound => StatusCode::SERVICE_UNAVAILABLE,
                 io::ErrorKind::PermissionDenied => StatusCode::FORBIDDEN,
-                // BIOS 拒绝（比如用电池时选狂暴）
                 _ => StatusCode::CONFLICT,
             };
-            (status, e.to_string()).into_response()
+            // 驱动用 EOPNOTSUPP 表示 BIOS 拒绝，比如用电池时选狂暴
+            let msg = if e.kind() == io::ErrorKind::Unsupported {
+                "BIOS 拒绝".to_owned()
+            } else {
+                e.to_string()
+            };
+            (status, msg).into_response()
         }
     }
 }
