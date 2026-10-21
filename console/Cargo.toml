@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 description = "Redmi G 2022 本机控制台"
 license = "GPL-2.0-or-later"
+repository = "https://github.com/Tailcoil/redmi-g-wmi"
+rust-version = "1.88"
 
 [dependencies]
 axum = "0.8"

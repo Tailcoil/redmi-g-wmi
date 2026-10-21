@@ -67,7 +67,7 @@ echo 1 | sudo tee touchpad_lock
 
 ## 控制台
 
-`console/` 是网页控制台：切换模式、开关锁、实时查看温度、风扇、功率限制和每个核心的频率电压。只监听本机，默认 `http://127.0.0.1:8930`。
+`console/` 是网页控制台：切换模式、开关锁、实时查看温度、风扇、功率限制和每个核心的频率电压。只监听本机，默认 `http://127.0.0.1:8930`。需要 Rust 1.88 以上。
 
 ```sh
 cargo build --release --manifest-path console/Cargo.toml
